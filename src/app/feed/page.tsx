@@ -19,7 +19,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 function FeedPageFallback() {
   return (
     <main className="mx-auto max-w-7xl p-6">
-      <div className="rounded-2xl bg-gray-100 p-6 text-gray-700 shadow">Loading feed…</div>
+      <div className="rounded-2xl bg-gray-100 p-6 text-gray-700 shadow">Loading feed...</div>
     </main>
   );
 }

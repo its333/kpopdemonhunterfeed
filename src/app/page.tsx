@@ -20,7 +20,7 @@ function HomePageFallback() {
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-6 pb-10 pt-8 text-white">
       <div className="rounded-2xl bg-slate-900/70 px-6 py-4 text-lg font-semibold shadow-lg shadow-indigo-900/20 backdrop-blur">
-        Loading feed…
+        Loading feed...
       </div>
     </main>
   );
