@@ -1,0 +1,31 @@
+# Dependencies & builds
+node_modules/
+.next/
+out/
+dist/
+.cache/
+.turbo/
+coverage/
+
+# Runtime caches & temp files
+tmp/
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE / OS junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

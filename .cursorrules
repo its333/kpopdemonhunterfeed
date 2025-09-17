@@ -1,0 +1,20 @@
+{
+"project": "Kpop Demon Hunter Feed",
+"style": {
+"language": "TypeScript",
+"framework": "Next.js 15 (App Router)",
+"ui": "TailwindCSS"
+},
+"conventions": [
+"Prefer small components in components/",
+"Use strict TS and explicit types",
+"Avoid any",
+"Use semantic HTML and aria labels",
+"Write pure functions in lib/"
+],
+"tasks": {
+"addProvider": "Create lib/providers/<name>.ts exporting async fetch<Name>(ctx) -> ProviderResult, wire in lib/providers/index.ts",
+"addCache": "Install upstash/redis and cache provider results for 60s on Vercel edge"
+}
+}
+
