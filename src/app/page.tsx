@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 // Use static import so Next can bundle the image even if it's not in /public
 // Path from this file to project root image
@@ -15,7 +16,17 @@ import { getFeedLimit } from '@/lib/feedLimits';
 import { useIncrementalReveal } from '@/lib/hooks/useIncrementalReveal';
 import type { FeedType } from '@/lib/types';
 
-export default function HomePage() {
+function HomePageFallback() {
+  return (
+    <main className="mx-auto max-w-7xl space-y-6 px-6 pb-10 pt-8 text-white">
+      <div className="rounded-2xl bg-slate-900/70 px-6 py-4 text-lg font-semibold shadow-lg shadow-indigo-900/20 backdrop-blur">
+        Loading feed…
+      </div>
+    </main>
+  );
+}
+
+function HomePageContent() {
   const params = useSearchParams();
   const type = (params.get('type') || 'all') as FeedType;
   const sort = params.get('sort') || 'popular';
@@ -79,3 +90,10 @@ export default function HomePage() {
   );
 }
 
+export default function HomePage() {
+  return (
+    <Suspense fallback={<HomePageFallback />}>
+      <HomePageContent />
+    </Suspense>
+  );
+}

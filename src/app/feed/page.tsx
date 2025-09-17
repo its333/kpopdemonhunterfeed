@@ -1,5 +1,6 @@
 "use client";
 import useSWR from 'swr';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TopTabs } from '@/components/TopTabs';
 import { SortSelect } from '@/components/SortSelect';
@@ -15,7 +16,15 @@ type FeedResponse = {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export default function FeedPage() {
+function FeedPageFallback() {
+  return (
+    <main className="mx-auto max-w-7xl p-6">
+      <div className="rounded-2xl bg-gray-100 p-6 text-gray-700 shadow">Loading feed…</div>
+    </main>
+  );
+}
+
+function FeedPageContent() {
   const params = useSearchParams();
   const type = (params.get('type') || 'all') as FeedType;
   const sort = params.get('sort') || 'popular';
@@ -53,3 +62,10 @@ export default function FeedPage() {
   );
 }
 
+export default function FeedPage() {
+  return (
+    <Suspense fallback={<FeedPageFallback />}>
+      <FeedPageContent />
+    </Suspense>
+  );
+}
