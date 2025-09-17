@@ -254,7 +254,9 @@ function resolveImageUrl(candidate?: string, base?: string): string | undefined 
   }
 }
 
-function extractImagesFromHtml(content: unknown, base?: string): string[] {\n  const html = typeof content === "string" ? content : fieldToText(content);\n  if (!html) return [];
+function extractImagesFromHtml(content: unknown, base?: string): string[] {
+  const html = typeof content === 'string' ? content : fieldToText(content);
+  if (!html) return [];
   const candidates = new Set<string>();
   const metaRegex = /<meta[^>]+(?:property|name)=["'](?:og:image|og:image:url|og:image:secure_url|twitter:image|twitter:image:src)["'][^>]+content=["']([^"']+)["'][^>]*>/gi;
   const imgRegex = /<img[^>]+(?:data-src|data-original|data-lazy-src|src)=["']([^"'\s>]+)["'][^>]*>/gi;
