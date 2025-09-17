@@ -4,27 +4,31 @@ import { useSearchParams } from 'next/navigation';
 import { TopTabs } from '@/components/TopTabs';
 import { SortSelect } from '@/components/SortSelect';
 import { FeedGrid } from '@/components/FeedGrid';
+import { getFeedLimit } from '@/lib/feedLimits';
+import { useIncrementalReveal } from '@/lib/hooks/useIncrementalReveal';
+import type { FeedItem, FeedType } from '@/lib/types';
 
-type FeedItem = {
-  id: string;
-  type: 'video' | 'article' | 'product';
-  title: string;
-  url: string;
-  thumbnailUrl?: string;
-  popularity?: number;
-  priceCents?: number;
-  source: string;
+type FeedResponse = {
+  items: FeedItem[];
+  errors?: Record<string, string>;
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function FeedPage() {
   const params = useSearchParams();
-  const type = params.get('type') || 'all';
+  const type = (params.get('type') || 'all') as FeedType;
   const sort = params.get('sort') || 'popular';
-  const { data, isLoading, error } = useSWR<{ items: FeedItem[]; errors?: Record<string, string> }>(`/api/feed?type=${type}&sort=${sort}&limit=10`, fetcher, {
+  const limit = getFeedLimit(type);
+  const { data, isLoading, error } = useSWR<FeedResponse>(`/api/feed?type=${type}&sort=${sort}&limit=${limit}`, fetcher, {
     keepPreviousData: true,
   } as any);
+
+  const items = data?.items ?? [];
+  const { items: visibleItems, sentinelRef, shouldRenderSentinel } = useIncrementalReveal(items, {
+    enabled: type === 'product',
+    chunkSize: 50,
+  });
 
   return (
     <main className="mx-auto max-w-7xl p-6">
@@ -34,7 +38,7 @@ export default function FeedPage() {
           <SortSelect />
         </div>
       </div>
-      {isLoading && <p>Loading…</p>}
+      {isLoading && <p>Loading...</p>}
       {error && <p role="alert">Failed to load feed.</p>}
       {!isLoading && data?.errors && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
@@ -43,9 +47,9 @@ export default function FeedPage() {
           ))}
         </div>
       )}
-      {data && <FeedGrid items={data.items} />}
+      {data && <FeedGrid items={visibleItems} />}
+      {shouldRenderSentinel && <div ref={sentinelRef} className="h-16" />}
     </main>
   );
 }
-
 

@@ -1,4 +1,5 @@
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { getServerEnv } from '@/lib/env';
 import type { ProviderContext, ProviderResult, VideoItem } from '@/lib/types';
 
 const YT_SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
@@ -12,10 +13,11 @@ export async function fetchYouTube(ctx: ProviderContext): Promise<ProviderResult
   const cached = await cacheGet<ProviderResult>(keyBase);
   if (cached) return cached;
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const { youtubeApiKey } = getServerEnv();
+  const apiKey = youtubeApiKey;
   if (!apiKey) return { items: [], nextCursor: null };
 
-  const envQuery = (process.env.YOUTUBE_SEARCH_QUERY || '').trim();
+  const envQuery = (process.env.YOUTUBE_SEARCH_QUERY || process.env.NEXT_PUBLIC_YOUTUBE_SEARCH_QUERY || '').trim();
   const queries = envQuery ? [envQuery] : ['kpop demon hunter', 'demon hunter kpop', 'kpop'];
   const order = ctx.sort === 'popular' ? 'viewCount' : 'date';
   let searchJson: { items: YtSearchItem[]; nextPageToken?: string } = { items: [] };

@@ -15,7 +15,6 @@ export function TopTabs({ basePath }: { basePath?: string } = {}) {
   const pathname = usePathname();
   const params = useSearchParams();
   const type = params.get('type') || 'all';
-  const sort = params.get('sort') || 'popular';
 
   function onSelect(nextType: string) {
     const search = new URLSearchParams(params.toString());
@@ -25,7 +24,7 @@ export function TopTabs({ basePath }: { basePath?: string } = {}) {
   }
 
   return (
-    <div role="tablist" aria-label="Content type" className="flex items-center gap-2 rounded-md bg-gray-100 p-1 dark:bg-gray-800">
+    <div role="tablist" aria-label="Content type" className="flex w-full items-center gap-2">
       {TABS.map((t) => {
         const active = t.key === type;
         return (
@@ -35,19 +34,17 @@ export function TopTabs({ basePath }: { basePath?: string } = {}) {
             aria-selected={active}
             onClick={() => onSelect(t.key)}
             className={
-              `px-3 py-1.5 text-sm font-medium rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ` +
-              (active ? 'bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white' : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 hover:dark:text-white')
+              `rounded-full px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ` +
+              (active
+                ? 'bg-indigo-500 text-white shadow shadow-indigo-900/40'
+                : 'bg-white/0 text-slate-200 hover:bg-white/10 hover:text-white')
             }
           >
             {t.label}
           </button>
         );
       })}
-      <div className="ml-auto" aria-hidden>
-        {/* spacer to align with SortSelect on the right on small screens when stacked */}
-      </div>
     </div>
   );
 }
-
 

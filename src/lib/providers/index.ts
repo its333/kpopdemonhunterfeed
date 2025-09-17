@@ -2,13 +2,9 @@ import type { FeedItem, FeedType, ProviderContext, ProviderResult, SortType } fr
 import { fetchYouTube } from './youtube';
 import { fetchRSS } from './rss';
 import { fetchGoogleProducts } from './googleProducts';
-import { cacheGet, cacheSet } from '@/lib/cache';
+import { getFeedLimit } from '@/lib/feedLimits';
 
 export async function fetchFeed(ctx: ProviderContext): Promise<ProviderResult> {
-  const cacheKey = `feed:${ctx.type}:${ctx.sort}:${ctx.limit}:${ctx.cursor ?? ''}`;
-  const cached = await cacheGet<ProviderResult>(cacheKey);
-  if (cached) return cached;
-
   const tasks: Promise<ProviderResult>[] = [];
   const wantVideo = ctx.type === 'video' || ctx.type === 'all';
   const wantArticle = ctx.type === 'article' || ctx.type === 'all';
@@ -24,7 +20,6 @@ export async function fetchFeed(ctx: ProviderContext): Promise<ProviderResult> {
     .map((r) => r.value);
   let items = results.flatMap((r) => r.items);
 
-  // Ensure representation from each category when type=all
   if (ctx.type === 'all') {
     const videos: FeedItem[] = items.filter((i) => i.type === 'video');
     const articles: FeedItem[] = items.filter((i) => i.type === 'article');
@@ -32,14 +27,13 @@ export async function fetchFeed(ctx: ProviderContext): Promise<ProviderResult> {
     sortItems(videos, ctx.sort);
     sortItems(articles, ctx.sort);
     sortItems(products, ctx.sort);
-    const per = Math.max(1, Math.floor((ctx.limit || 10) / 3));
+    const per = Math.max(1, Math.floor((ctx.limit || getFeedLimit('all')) / 3));
     const merged: FeedItem[] = [];
     for (let i = 0; i < per; i++) {
       if (videos[i]) merged.push(videos[i]);
       if (articles[i]) merged.push(articles[i]);
       if (products[i]) merged.push(products[i]);
     }
-    // If still short, fill with remaining best items overall
     const remainderPool = [...videos.slice(per), ...articles.slice(per), ...products.slice(per)];
     sortItems(remainderPool, ctx.sort);
     while (merged.length < ctx.limit && remainderPool.length) {
@@ -51,12 +45,10 @@ export async function fetchFeed(ctx: ProviderContext): Promise<ProviderResult> {
     sortItems(items, ctx.sort);
   }
 
-  // naive cursor: we forward only YouTube's cursor for now
   const nextCursor = results.find((r) => r.nextCursor)?.nextCursor ?? null;
   const errors = Object.assign({}, ...results.map((r) => r.errors || {}));
-  const cap = ctx.type === 'article' ? 50 : ctx.type === 'product' ? 50 : ctx.type === 'video' ? 25 : ctx.type === 'all' ? 125 : 10;
+  const cap = getFeedLimit(ctx.type === 'all' ? 'all' : ctx.type);
   const result: ProviderResult = { items: items.slice(0, Math.min(cap, ctx.limit)), nextCursor, errors: Object.keys(errors).length ? errors : undefined };
-  await cacheSet(cacheKey, result, 60 * 60 * 24);
   return result;
 }
 
@@ -67,5 +59,4 @@ function sortItems(items: FeedItem[], sort: SortType) {
 
 export type { ProviderContext, ProviderResult } from '@/lib/types';
 export type { FeedItem, FeedType, SortType } from '@/lib/types';
-
 

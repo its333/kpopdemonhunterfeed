@@ -21,3 +21,12 @@ html, body, #__next { height: 100%; }
   animation: fadeInUp 300ms ease-out both;
 }
 
+
+body {
+  background-image: url('/backg.webp');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
+  background-color: #0f172a;
+}

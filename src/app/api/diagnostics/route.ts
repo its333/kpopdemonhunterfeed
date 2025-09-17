@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server';
 import { fetchFeed } from '@/lib/providers';
+import { getServerEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest) {
+  const envVars = getServerEnv();
   const env = {
-    youtube: Boolean(process.env.YOUTUBE_API_KEY),
-    serpapi: Boolean(process.env.SERPAPI_API_KEY),
-    upstash: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+    youtube: Boolean(envVars.youtubeApiKey),
+    serpapi: Boolean(envVars.serpApiKey),
+    upstash: Boolean(envVars.upstashRedisUrl && envVars.upstashRedisToken),
   };
 
   const [videos, news, products] = await Promise.allSettled([
@@ -32,5 +34,3 @@ export async function GET(_req: NextRequest) {
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }
-
-

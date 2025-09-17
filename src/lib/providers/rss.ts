@@ -12,12 +12,12 @@ type FeedParserItem = {
   link?: string;
   guid?: string;
   isoDate?: string;
-  categories?: string[];
-  content?: string;
-  contentSnippet?: string;
+  categories?: Array<string | { _: string }> | string;
+  content?: unknown;
+  contentSnippet?: unknown;
   enclosure?: { url?: string };
-  'content:encoded'?: string;
-  'content:encodedSnippet'?: string;
+  'content:encoded'?: unknown;
+  'content:encodedSnippet'?: unknown;
   'media:thumbnail'?: MediaEntry | MediaEntry[];
   'media:content'?: MediaEntry | MediaEntry[];
   'media:group'?: MediaGroup;
@@ -98,24 +98,30 @@ export async function fetchRSS(ctx: ProviderContext): Promise<ProviderResult> {
       const baseLink = normalizedLink && normalizedLink.trim() ? normalizedLink : undefined;
       const aggregatorLink = isAggregatorUrl(baseLink ?? rawItem.link);
       const link = baseLink ?? rawItem.link ?? '#';
-      const dedupeKey = (baseLink && !aggregatorLink ? baseLink : undefined) ?? rawItem.guid ?? rawItem.title;
+      const canonicalLink = canonicalizeUrl(link);
+      const dedupeKey =
+        (canonicalLink && canonicalLink !== '#') ? canonicalLink :
+        rawItem.guid ?? rawItem.title ?? '';
+
       if (dedupeKey && seen.has(dedupeKey)) continue;
       if (dedupeKey) seen.add(dedupeKey);
 
-      let id = rawItem.guid || baseLink || rawItem.link || rawItem.isoDate;
+      let id = rawItem.guid || (canonicalLink && canonicalLink !== '#' ? canonicalLink : rawItem.link) || rawItem.isoDate;
       if (!id) id = createFallbackId();
 
-      const imageBase = aggregatorLink ? undefined : baseLink;
+      const imageBase = aggregatorLink ? undefined : canonicalLink || baseLink;
       const thumbnailUrl = aggregatorLink ? undefined : extractThumbnail(rawItem, imageBase);
+
+      const finalLink = canonicalLink || link;
 
       items.push({
         id,
         type: 'article',
         title: rawItem.title || 'Untitled',
-        url: link,
+        url: finalLink,
         thumbnailUrl,
         publishedAt: rawItem.isoDate,
-        source: extractSourceLabel(link),
+        source: extractSourceLabel(finalLink),
       });
     }
   }
@@ -133,7 +139,7 @@ export async function fetchRSS(ctx: ProviderContext): Promise<ProviderResult> {
   }
 
   const result: ProviderResult = { items: items.slice(0, Math.min(50, ctx.limit)), nextCursor: null };
-  await cacheSet(key, result, 60 * 60 * 24);
+  await cacheSet(key, result, 60 * 5);
   return result;
 }
 
@@ -162,6 +168,26 @@ function dedupeFeedSources(sources: FeedSourceSpec[]): FeedSourceSpec[] {
   return deduped;
 }
 
+function fieldToText(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => fieldToText(entry))
+      .filter((entry) => entry.length > 0)
+      .join(' ');
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (typeof record._ === 'string') return record._;
+    return Object.values(record)
+      .map((entry) => fieldToText(entry))
+      .filter((entry) => entry.length > 0)
+      .join(' ');
+  }
+  return '';
+}
+
 function isRelevant(item: FeedParserItem): boolean {
   const fields = [
     item.title,
@@ -169,9 +195,11 @@ function isRelevant(item: FeedParserItem): boolean {
     item.content,
     item['content:encoded'],
     item['content:encodedSnippet'],
-    item.categories?.join(' '),
+    item.categories,
     item.link,
-  ].filter(Boolean);
+  ]
+    .map((value) => fieldToText(value))
+    .filter((value) => value.length > 0);
   if (fields.length === 0) return false;
 
   const haystack = fields.join(' ').toLowerCase();
@@ -327,22 +355,22 @@ function normalizeLink(rawLink: string | undefined, feedUrl: string): string | u
     const host = parsed.hostname;
     if (host.includes('news.google.com')) {
       const candidate = parsed.searchParams.get('url');
-      if (candidate) return decodeParam(candidate);
+      if (candidate) return canonicalizeUrl(decodeParam(candidate));
     }
     if (host.includes('bing.com')) {
       const candidate = parsed.searchParams.get('url') ?? parsed.searchParams.get('r');
-      if (candidate) return decodeParam(candidate);
+      if (candidate) return canonicalizeUrl(decodeParam(candidate));
     }
-    return parsed.href;
+    return canonicalizeUrl(parsed.toString());
   } catch {
     if (!rawLink.startsWith('http')) {
       try {
-        return new URL(rawLink, feedUrl).href;
+        return canonicalizeUrl(new URL(rawLink, feedUrl).toString());
       } catch {
-        return rawLink;
+        return canonicalizeUrl(rawLink);
       }
     }
-    return rawLink;
+    return canonicalizeUrl(rawLink);
   }
 }
 
@@ -351,6 +379,53 @@ function decodeParam(value: string): string {
     return decodeURIComponent(value);
   } catch {
     return value;
+  }
+}
+
+function canonicalizeUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    url.username = '';
+    url.password = '';
+    url.hostname = url.hostname.toLowerCase();
+    const removableParams = new Set([
+      'ref',
+      'ref_',
+      'refsrc',
+      'ref_src',
+      'ref_url',
+      'rss',
+      'feed',
+      'output',
+      'amp',
+      'amp_share',
+      'feature',
+      'share',
+      'spref',
+      'source',
+      'via'
+    ]);
+    const removablePrefixes = ['utm', 'utm_', 'mc_', 'mkt_', 'ga_', 'fbclid', 'gclid', 'yclid', 'icid', 'ocid', 'cmpid', 'rb_clickid', 'igshid', 'msclkid'];
+    const params = url.searchParams;
+    for (const key of Array.from(params.keys())) {
+      const lower = key.toLowerCase();
+      if (removableParams.has(lower)) {
+        params.delete(key);
+        continue;
+      }
+      if (removablePrefixes.some((prefix) => lower.startsWith(prefix))) {
+        params.delete(key);
+      }
+    }
+    const query = params.toString();
+    url.search = query ? `?${query}` : '';
+    if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1);
+    }
+    return url.toString();
+  } catch {
+    return raw;
   }
 }
 
@@ -410,4 +485,5 @@ async function enrichMissingThumbnails(items: ArticleItem[]): Promise<void> {
     })
   );
 }
+
 
