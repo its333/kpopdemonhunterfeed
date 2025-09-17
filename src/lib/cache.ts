@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis';
+import { getServerEnv } from '@/lib/env';
 
 type MemoryEntry = { value: unknown; expiresAt: number };
 
@@ -40,8 +41,9 @@ function clearMemory(prefix?: string): number {
 export function getRedis(): Redis | null {
   if (redisClient && redisClient !== 'failed') return redisClient;
   if (redisClient === 'failed') return null;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const { upstashRedisUrl, upstashRedisToken } = getServerEnv();
+  const url = upstashRedisUrl;
+  const token = upstashRedisToken;
   if (!url || !token) return null;
   try {
     redisClient = new Redis({ url, token });
@@ -82,23 +84,35 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
   }
 }
 
+async function deleteByPattern(redis: Redis, pattern: string): Promise<number> {
+  let cursor = '0';
+  let removed = 0;
+  do {
+    const [nextCursor, keys] = await redis.scan(cursor, { match: pattern, count: 100 });
+    if (Array.isArray(keys) && keys.length > 0) {
+      for (const key of keys) {
+        const keyString = typeof key === 'string' ? key : String(key);
+        await redis.del(keyString);
+        removed++;
+      }
+    }
+    cursor = typeof nextCursor === 'string' ? nextCursor : String(nextCursor);
+  } while (cursor !== '0');
+  return removed;
+}
+
 export async function cacheFlush(prefix?: string): Promise<{ memory: number; redis: number }> {
   const memoryCleared = clearMemory(prefix);
 
   const redis = getRedis();
   if (!redis) return { memory: memoryCleared, redis: 0 };
 
-  let redisCleared = 0;
   const pattern = prefix && prefix.length > 0 ? `${prefix}*` : '*';
   try {
-    for await (const key of redis.scanIterator({ match: pattern })) {
-      const keyString = typeof key === 'string' ? key : String(key);
-      await redis.del(keyString);
-      redisCleared++;
-    }
-  } catch {
+    const redisCleared = await deleteByPattern(redis, pattern);
     return { memory: memoryCleared, redis: redisCleared };
+  } catch {
+    return { memory: memoryCleared, redis: 0 };
   }
-  return { memory: memoryCleared, redis: redisCleared };
 }
 
